@@ -189,8 +189,27 @@ const DOM = {
     exportBtn: document.getElementById('export-audit'),
     themeBtn: document.getElementById('theme-toggle'),
     cryptoScreen: document.getElementById('crypto-screen'),
-    hashStream: document.getElementById('hash-stream')
+    hashStream: document.getElementById('hash-stream'),
+    menuToggle: document.getElementById('menu-toggle'),
+    sidebarBackdrop: document.getElementById('sidebar-backdrop')
 };
+
+// ==========================================
+// MOBILE SIDEBAR DRAWER
+// ==========================================
+function openSidebar() {
+    document.body.classList.add('sidebar-open');
+    DOM.menuToggle.setAttribute('aria-expanded', 'true');
+}
+
+function closeSidebar() {
+    document.body.classList.remove('sidebar-open');
+    DOM.menuToggle.setAttribute('aria-expanded', 'false');
+}
+
+function toggleSidebar() {
+    document.body.classList.contains('sidebar-open') ? closeSidebar() : openSidebar();
+}
 
 // Toggle AI Studio Implementation
 function refreshAIButton(btnElement) {
@@ -261,7 +280,17 @@ async function init() {
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
             e.currentTarget.classList.add('active');
             renderGrid(e.currentTarget.dataset.filter, DOM.search.value);
+            if (window.innerWidth <= 768) closeSidebar();
         });
+    });
+
+    DOM.menuToggle.addEventListener('click', toggleSidebar);
+    DOM.sidebarBackdrop.addEventListener('click', closeSidebar);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.body.classList.contains('sidebar-open')) closeSidebar();
+    });
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768) closeSidebar();
     });
 
     DOM.search.addEventListener('input', e => renderGrid(document.querySelector('.filter-btn.active').dataset.filter, e.target.value.toLowerCase()));
