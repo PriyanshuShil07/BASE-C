@@ -174,6 +174,15 @@ body {
     color: #ffffff;
 }
 
+/* Visible keyboard focus (mouse/touch users don't see this, keyboard users do) */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+.task-card:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
+}
+
 /* ==========================================================================
    5. FLUID SIDEBAR NAVIGATION
    ========================================================================== */
@@ -442,6 +451,38 @@ body {
     color: var(--text-muted);
     font-family: var(--font-mono);
     font-weight: 600;
+}
+
+.menu-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    background: var(--glass-highlight);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    color: var(--text-main);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.menu-toggle:hover {
+    background: var(--neon-cyan-dim);
+    color: var(--neon-cyan);
+    border-color: rgba(0, 240, 255, 0.4);
+}
+
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(2px);
+    z-index: 50;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .sys-status {
@@ -1074,34 +1115,104 @@ body {
 }
 
 /* ==========================================================================
-   15. MOBILE ARCHITECTURE OVERRIDE (CRITICAL FIX)
+   15. RESPONSIVE ARCHITECTURE — TABLET, PHONE & DRAWER NAVIGATION
    ========================================================================== */
+
+/* ---- Tablet (769px - 1024px): tighten sidebar, keep two-column layout ---- */
+@media screen and (max-width: 1024px) {
+    .sidebar {
+        flex-basis: 240px;
+        padding: 20px 16px;
+    }
+
+    .scroll-area {
+        padding: clamp(16px, 3vw, 28px);
+    }
+
+    .task-grid {
+        gap: 18px;
+    }
+}
+
+/* ---- Phone (≤768px): sidebar becomes a slide-in drawer ---- */
 @media screen and (max-width: 768px) {
     body {
         flex-direction: column !important;
         overflow-x: hidden !important;
     }
 
+    .menu-toggle {
+        display: flex;
+    }
+
     .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 60;
         flex: none !important;
-        max-width: 100% !important;
-        width: 100% !important;
-        border-right: none !important;
-        border-bottom: 1px solid var(--glass-highlight) !important;
-        padding: 16px !important;
+        width: min(85vw, 320px) !important;
+        max-width: none !important;
+        height: 100vh;
+        height: 100dvh;
+        border-right: 1px solid var(--glass-highlight) !important;
+        border-bottom: none !important;
+        padding: 20px 16px !important;
+        padding-top: max(20px, env(safe-area-inset-top)) !important;
+        padding-left: max(16px, env(safe-area-inset-left)) !important;
+        overflow-y: auto;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: none;
+    }
+
+    body.sidebar-open .sidebar {
+        transform: translateX(0);
+        box-shadow: 20px 0 50px rgba(0, 0, 0, 0.5);
+    }
+
+    body.sidebar-open .sidebar-backdrop {
+        display: block;
+        opacity: 1;
     }
 
     .dashboard {
         min-width: 100% !important;
+        width: 100%;
         flex: 1 !important;
-        height: auto !important; 
+        height: 100vh;
+        height: 100dvh;
     }
 
     .topbar {
-        padding: 15px !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 15px !important;
+        padding: 14px 16px !important;
+        padding-top: max(14px, env(safe-area-inset-top)) !important;
+        gap: 12px !important;
+        min-height: auto;
+    }
+
+    .search-wrapper {
+        order: 3;
+        flex-basis: 100%;
+        max-width: 100%;
+    }
+
+    .search-wrapper kbd {
+        display: none;
+    }
+
+    .topbar-controls {
+        order: 2;
+        flex: 1;
+        justify-content: flex-end;
+    }
+
+    .sys-status span {
+        display: none;
+    }
+
+    .sys-status {
+        padding: 10px;
     }
 
     .workspace-overlay {
@@ -1132,6 +1243,83 @@ body {
         flex: none !important;
         width: 100% !important;
         min-height: 50vh !important; 
+    }
+
+    .task-card {
+        padding: 22px;
+        min-height: unset;
+    }
+}
+
+/* ---- Small phone (≤480px): denser type scale, single-column comfort ---- */
+@media screen and (max-width: 480px) {
+    .scroll-area {
+        padding: 16px;
+    }
+
+    .stats-grid {
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+
+    .stat-card {
+        padding: 18px;
+        gap: 16px;
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+    }
+
+    .task-grid {
+        gap: 14px;
+    }
+
+    .task-card {
+        padding: 18px;
+    }
+
+    .topbar-btn {
+        font-size: 0.75rem;
+        padding: 9px 12px;
+    }
+
+    .workspace-header {
+        padding: 14px 16px;
+    }
+
+    .btn {
+        padding: 12px 14px;
+        font-size: 0.8rem;
+    }
+
+    #toast-container {
+        left: 16px;
+        right: 16px;
+        bottom: max(20px, env(safe-area-inset-bottom));
+    }
+
+    .toast {
+        padding: 14px 18px;
+        font-size: 0.85rem;
+    }
+}
+
+/* ---- Landscape phones with limited height: keep the modal usable ---- */
+@media screen and (max-height: 480px) and (max-width: 900px) {
+    .editor-pane, .console-pane {
+        min-height: 40vh !important;
+    }
+}
+
+/* ---- Reduced motion: respect the OS-level accessibility preference ---- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
     }
 }
 
