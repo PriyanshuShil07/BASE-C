@@ -346,6 +346,22 @@ body {
     box-shadow: 0 0 20px var(--neon-cyan-dim);
 }
 
+.tool-btn.active {
+    background: var(--neon-cyan-dim);
+    color: var(--neon-cyan);
+    border-color: rgba(0, 240, 255, 0.3);
+    box-shadow: 0 0 20px var(--neon-cyan-dim);
+}
+
+.tool-btn.off {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+.tool-btn.off:hover {
+    opacity: 1;
+}
+
 /* ==========================================================================
    6. MAIN DASHBOARD & FLUID TOPBAR
    ========================================================================== */
@@ -356,7 +372,7 @@ body {
     flex-direction: column;
     position: relative;
     height: 100vh;
-    min-height: 0; /* FIX: allows flex children below to actually shrink & scroll */
+    min-height: 0; 
 }
 
 .topbar {
@@ -457,7 +473,7 @@ body {
    ========================================================================== */
 .scroll-area {
     flex: 1;
-    min-height: 0; /* FIX: without this, 524 task cards overflow the box instead of scrolling inside it */
+    min-height: 0; 
     overflow-y: auto;
     padding: clamp(20px, 4vw, 40px); 
     scroll-behavior: smooth;
@@ -1061,13 +1077,11 @@ body {
    15. MOBILE ARCHITECTURE OVERRIDE (CRITICAL FIX)
    ========================================================================== */
 @media screen and (max-width: 768px) {
-    /* 1. Force the main layout to stack vertically instead of wrapping */
     body {
         flex-direction: column !important;
         overflow-x: hidden !important;
     }
 
-    /* 2. Break the sidebar out of its 350px limit */
     .sidebar {
         flex: none !important;
         max-width: 100% !important;
@@ -1077,14 +1091,12 @@ body {
         padding: 16px !important;
     }
 
-    /* 3. Allow dashboard to shrink below its 320px min-width */
     .dashboard {
         min-width: 100% !important;
         flex: 1 !important;
-        height: auto !important; /* <--- THIS PREVENTS THE MOBILE SCROLL BUG */
+        height: auto !important; 
     }
 
-    /* 4. Fix topbar wrapping */
     .topbar {
         padding: 15px !important;
         flex-direction: column !important;
@@ -1092,7 +1104,6 @@ body {
         gap: 15px !important;
     }
 
-    /* 5. OVERRIDE THE MODAL */
     .workspace-overlay {
         padding: 0 !important; 
     }
@@ -1104,13 +1115,11 @@ body {
         height: 100dvh !important; 
     }
 
-    /* 6. Stack the code editor and the terminal vertically */
     .workspace-split {
         flex-direction: column !important;
         overflow-y: auto !important;
     }
 
-    /* 7. Destroy the 400px and 300px flex-basis rules */
     .editor-pane {
         flex: none !important;
         width: 100% !important;
@@ -1123,5 +1132,59 @@ body {
         flex: none !important;
         width: 100% !important;
         min-height: 50vh !important; 
+    }
+}
+
+/* ==========================================================================
+   16. TOPBAR CONTROLS (AI & VOICE TOGGLES)
+   ========================================================================== */
+.topbar-controls {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin: 0 auto;
+}
+
+.topbar-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    background: var(--glass-highlight);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-weight: 700;
+    font-size: 0.85rem;
+    transition: var(--transition-fast);
+    white-space: nowrap;
+}
+
+.topbar-btn:hover {
+    background: var(--neon-cyan-dim);
+    color: var(--text-main);
+    border-color: rgba(0, 240, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+.topbar-btn.active {
+    background: var(--neon-cyan-dim);
+    color: var(--neon-cyan);
+    border-color: rgba(0, 240, 255, 0.4);
+    box-shadow: 0 0 15px var(--neon-cyan-dim);
+}
+
+.topbar-btn.off {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+@media screen and (max-width: 1024px) {
+    .topbar-controls {
+        margin: 0;
+        width: 100%;
+        justify-content: flex-end;
     }
 }
