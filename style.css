@@ -1,6 +1,5 @@
 /* ==========================================================================
    BASE-C | EXECUTION ENVIRONMENT
-   System Architect: Priyanshu Shil
    Version: 5.0.0 (Premium SOC Build - Intrinsic Fluid Design)
    ========================================================================== */
 
@@ -115,7 +114,7 @@ body {
     background-color: var(--bg-deep);
     color: var(--text-main);
     display: flex;
-    flex-wrap: wrap; /* Allows the sidebar to wrap to the top on mobile */
+    flex-wrap: wrap; 
     min-height: 100vh;
     width: 100vw;
     overflow-x: hidden;
@@ -179,8 +178,8 @@ body {
    5. FLUID SIDEBAR NAVIGATION
    ========================================================================== */
 .sidebar {
-    flex: 1 1 280px; /* Base 280px, can grow or shrink */
-    max-width: 350px; /* Prevents it from taking over the screen on massive monitors */
+    flex: 1 1 280px; 
+    max-width: 350px; 
     background: var(--bg-surface);
     border-right: 1px solid var(--glass-highlight);
     border-bottom: 1px solid var(--glass-highlight);
@@ -254,9 +253,6 @@ body {
     border: 1px solid rgba(0, 240, 255, 0.4);
 }
 
-/* ==========================================================================
-   CONTACT PORTFOLIO LINKS (Adblock-Safe)
-   ========================================================================== */
 .contact-row {
     display: flex;
     justify-content: center;
@@ -302,7 +298,6 @@ body {
     border-color: var(--neon-cyan);
 }
 
-/* Sidebar Nav Groups */
 .nav-header {
     font-size: 0.75rem;
     color: var(--text-muted);
@@ -355,17 +350,18 @@ body {
    6. MAIN DASHBOARD & FLUID TOPBAR
    ========================================================================== */
 .dashboard {
-    flex: 999 1 0%; /* Fills the rest of the screen */
-    min-width: 320px; /* Forces wrap on very small screens */
+    flex: 999 1 0%; 
+    min-width: 320px; 
     display: flex;
     flex-direction: column;
     position: relative;
     height: 100vh;
+    min-height: 0; /* FIX: allows flex children below to actually shrink & scroll */
 }
 
 .topbar {
     display: flex;
-    flex-wrap: wrap; /* Allows search and status to stack seamlessly */
+    flex-wrap: wrap; 
     justify-content: space-between;
     align-items: center;
     gap: 20px;
@@ -381,7 +377,7 @@ body {
     position: relative;
     display: flex;
     align-items: center;
-    flex: 1 1 300px; /* Search bar is fluid */
+    flex: 1 1 300px; 
     max-width: 500px;
 }
 
@@ -461,14 +457,14 @@ body {
    ========================================================================== */
 .scroll-area {
     flex: 1;
+    min-height: 0; /* FIX: without this, 524 task cards overflow the box instead of scrolling inside it */
     overflow-y: auto;
-    padding: clamp(20px, 4vw, 40px); /* Padding adapts to screen width */
+    padding: clamp(20px, 4vw, 40px); 
     scroll-behavior: smooth;
 }
 
 .stats-grid {
     display: grid;
-    /* Auto-fit pushes cards to the next row automatically when space is tight */
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
     gap: 30px;
     margin-bottom: 50px;
@@ -519,7 +515,6 @@ body {
 }
 
 .stat-data h2 {
-    /* Font scales natively */
     font-size: clamp(1.5rem, 4vw, 2.5rem);
     font-weight: 800;
     display: inline-block;
@@ -551,7 +546,6 @@ body {
    ========================================================================== */
 .task-grid {
     display: grid;
-    /* Adapts seamlessly: Fits as many 320px cards as it can without media queries */
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
     gap: 24px;
 }
@@ -813,14 +807,14 @@ body {
    ========================================================================== */
 .workspace-split {
     display: flex;
-    flex-wrap: wrap; /* Stacks panels automatically on tight screens */
+    flex-wrap: wrap; 
     flex: 1;
     min-height: 0;
     overflow-y: auto;
 }
 
 .editor-pane {
-    flex: 2 1 400px; /* Takes priority, fluidly scales */
+    flex: 2 1 400px; 
     border-right: 1px solid var(--glass-highlight);
     background: var(--bg-console);
     display: flex;
@@ -828,7 +822,7 @@ body {
 }
 
 .console-pane {
-    flex: 1.2 1 300px; /* Secondary focus, stacks when < 300px available */
+    flex: 1.2 1 300px; 
     display: flex;
     flex-direction: column;
 }
@@ -860,7 +854,7 @@ body {
 #monaco-editor {
     flex: 1;
     width: 100%;
-    min-height: 250px; /* Ensures minimum typing area when stacked */
+    min-height: 250px; 
 }
 
 .tab-btn {
@@ -927,7 +921,6 @@ body {
     text-shadow: 0 0 2px rgba(163, 177, 198, 0.5);
 }
 
-/* AI Chat */
 .ai-chat {
     display: flex;
     flex-direction: column;
@@ -1013,12 +1006,12 @@ body {
     position: fixed;
     bottom: 30px;
     right: 30px;
-    left: 30px; /* added for fluid centering on tight screens */
-    pointer-events: none; /* so toast container doesn't block clicks */
+    left: 30px; 
+    pointer-events: none; 
     z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
-    align-items: flex-end; /* forces toasts to the right normally */
+    align-items: flex-end; 
     gap: 12px;
 }
 
@@ -1037,7 +1030,7 @@ body {
     color: var(--text-main);
     font-family: var(--font-ui);
     animation: slideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    max-width: 100%; /* Ensure it fits on screen */
+    max-width: 100%; 
 }
 
 /* ==========================================================================
@@ -1088,6 +1081,7 @@ body {
     .dashboard {
         min-width: 100% !important;
         flex: 1 !important;
+        height: auto !important; /* <--- THIS PREVENTS THE MOBILE SCROLL BUG */
     }
 
     /* 4. Fix topbar wrapping */
@@ -1098,16 +1092,16 @@ body {
         gap: 15px !important;
     }
 
-    /* 5. OVERRIDE THE MODAL (The main reason it breaks on mobile) */
+    /* 5. OVERRIDE THE MODAL */
     .workspace-overlay {
-        padding: 0 !important; /* Remove padding to maximize phone screen space */
+        padding: 0 !important; 
     }
 
     .workspace-glass {
-        border-radius: 0 !important; /* Make it flush with phone edges */
+        border-radius: 0 !important; 
         border: none !important;
         height: 100vh !important;
-        height: 100dvh !important; /* Accounts for mobile browser UI bars */
+        height: 100dvh !important; 
     }
 
     /* 6. Stack the code editor and the terminal vertically */
@@ -1120,7 +1114,7 @@ body {
     .editor-pane {
         flex: none !important;
         width: 100% !important;
-        min-height: 50vh !important; /* Give code editor half the phone screen */
+        min-height: 50vh !important; 
         border-right: none !important;
         border-bottom: 1px solid var(--glass-highlight) !important;
     }
@@ -1128,6 +1122,6 @@ body {
     .console-pane {
         flex: none !important;
         width: 100% !important;
-        min-height: 50vh !important; /* Give terminal the other half */
+        min-height: 50vh !important; 
     }
 }
