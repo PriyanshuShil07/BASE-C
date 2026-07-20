@@ -54,8 +54,12 @@ class AudioEngine {
 const audioSys = new AudioEngine();
 
 // ==========================================
-// 2. CLOUD DATABASE (PUTER.JS)
+// 2. CLOUD DATABASE (JSONBIN.IO - NO LOGIN)
 // ==========================================
+const BIN_ID = "6a5e31a7da38895dfe7685d5"; 
+const API_KEY = "$2a$10$F0maGuUqRSceze6A.juiduAB4QpLrw9RUQGbMsHxwz5FFN11TtI1C"; 
+const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+
 let progress = [];
 let codeMap = {};
 
@@ -115,16 +119,27 @@ const DOM = {
 async function init() {
     lucide.createIcons();
     
-    // FETCH FROM CLOUD
+    // FETCH FROM JSONBIN SILENTLY
+    showToast("Syncing with cloud database...");
     try {
-        const cloudProgress = await puter.kv.get(CONFIG.KEYS.PROGRESS);
-        const cloudCodeMap = await puter.kv.get(CONFIG.KEYS.CODE);
+        const response = await fetch(BIN_URL, {
+            method: 'GET',
+            headers: {
+                'X-Access-Key': API_KEY
+            }
+        });
         
-        // Puter returns null if the key doesn't exist yet, so we fall back to defaults
-        progress = cloudProgress || [];
-        codeMap = cloudCodeMap || {};
+        if (response.ok) {
+            const data = await response.json();
+            progress = data.record.progress || [];
+            codeMap = data.record.codeMap || {};
+            showToast("Cloud sync complete.");
+        } else {
+            console.error("Failed to load data");
+            showToast("Warning: Loaded offline data.");
+        }
     } catch (err) {
-        console.error("Cloud sync failed:", err);
+        console.error("Cloud sync error:", err);
     }
 
     renderGrid('all');
@@ -283,19 +298,28 @@ async function finalizeSave() {
     const code = window.editor.getValue();
     codeMap[currentTask.id] = code;
     
-    // Save code map to cloud
-    await puter.kv.set(CONFIG.KEYS.CODE, codeMap);
-    
     if (!progress.includes(currentTask.id)) {
         progress.push(currentTask.id);
-        
-        // Save progress array to cloud
-        await puter.kv.set(CONFIG.KEYS.PROGRESS, progress);
+    }
+
+    // SILENTLY PUSH TO JSONBIN
+    try {
+        await fetch(BIN_URL, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Access-Key': API_KEY
+            },
+            body: JSON.stringify({ progress, codeMap })
+        });
         
         updateStats();
         renderGrid(document.querySelector('.filter-btn.active').dataset.filter, DOM.search.value);
+        showToast("CTF Flag Accepted. Memory sector encrypted to cloud.");
+    } catch (err) {
+        console.error("Save failed:", err);
+        showToast("ERROR: Could not sync to cloud.");
     }
-    showToast("CTF Flag Accepted. Synced to Puter Cloud.");
 }
 
 // ==========================================
