@@ -54,14 +54,10 @@ class AudioEngine {
 const audioSys = new AudioEngine();
 
 // ==========================================
-// 2. DATABASE MANAGER
+// 2. CLOUD DATABASE (PUTER.JS)
 // ==========================================
-class DB {
-    static load(k, def) { try { return JSON.parse(localStorage.getItem(k)) || def; } catch { return def; } }
-    static save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
-}
-let progress = DB.load(CONFIG.KEYS.PROGRESS, []);
-let codeMap = DB.load(CONFIG.KEYS.CODE, {});
+let progress = [];
+let codeMap = {};
 
 // ==========================================
 // 3. AUDIT REPORT GENERATOR
@@ -116,8 +112,21 @@ const DOM = {
     hashStream: document.getElementById('hash-stream')
 };
 
-function init() {
+async function init() {
     lucide.createIcons();
+    
+    // FETCH FROM CLOUD
+    try {
+        const cloudProgress = await puter.kv.get(CONFIG.KEYS.PROGRESS);
+        const cloudCodeMap = await puter.kv.get(CONFIG.KEYS.CODE);
+        
+        // Puter returns null if the key doesn't exist yet, so we fall back to defaults
+        progress = cloudProgress || [];
+        codeMap = cloudCodeMap || {};
+    } catch (err) {
+        console.error("Cloud sync failed:", err);
+    }
+
     renderGrid('all');
     updateStats();
     
@@ -270,18 +279,23 @@ function triggerCryptoUnlock() {
     }, 1200);
 }
 
-function finalizeSave() {
+async function finalizeSave() {
     const code = window.editor.getValue();
     codeMap[currentTask.id] = code;
-    DB.save(CONFIG.KEYS.CODE, codeMap);
+    
+    // Save code map to cloud
+    await puter.kv.set(CONFIG.KEYS.CODE, codeMap);
     
     if (!progress.includes(currentTask.id)) {
         progress.push(currentTask.id);
-        DB.save(CONFIG.KEYS.PROGRESS, progress);
+        
+        // Save progress array to cloud
+        await puter.kv.set(CONFIG.KEYS.PROGRESS, progress);
+        
         updateStats();
         renderGrid(document.querySelector('.filter-btn.active').dataset.filter, DOM.search.value);
     }
-    showToast("CTF Flag Accepted. Memory sector encrypted.");
+    showToast("CTF Flag Accepted. Synced to Puter Cloud.");
 }
 
 // ==========================================
