@@ -125,7 +125,7 @@ async function init() {
         const response = await fetch(BIN_URL, {
             method: 'GET',
             headers: {
-                'X-Access-Key': API_KEY
+                'X-Master-Key': API_KEY // Fix: Use X-Master-Key instead of X-Access-Key
             }
         });
         
@@ -308,7 +308,7 @@ async function finalizeSave() {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Access-Key': API_KEY
+                'X-Master-Key': API_KEY // Fix: Use X-Master-Key instead of X-Access-Key
             },
             body: JSON.stringify({ progress, codeMap })
         });
