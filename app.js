@@ -1,16 +1,46 @@
 const CONFIG = {
-    KEYS: { PROGRESS: 'suraksha_prog_v7', CODE: 'suraksha_code_v7' },
+    KEYS: {
+        PROGRESS: 'suraksha_prog_v7',
+        CODE: 'suraksha_code_v7',
+        VOICE: 'suraksha_voice_v1',
+        AI_STUDIO: 'suraksha_ai_studio_v1'
+    },
     COLORS: { CYAN: '#00f0ff', GREEN: '#10b981', RED: '#ef4444', MUTED: '#8b949e' }
 };
 
+// Read saved on/off preferences (default: both ON, matching the markup)
+let aiStudioEnabled = localStorage.getItem(CONFIG.KEYS.AI_STUDIO) !== 'off';
+
 // ==========================================
-// 1. AMBIENT AUDIO ENGINE (Comms Array)
+// 1. LOAD DATA (provided by data.js -> window.C_ASSIGNMENTS)
+// ==========================================
+const C_ASSIGNMENTS = window.C_ASSIGNMENTS || [];
+if (C_ASSIGNMENTS.length === 0) {
+    console.error("C_ASSIGNMENTS is empty — make sure data.js is loaded before app.js in index.html.");
+}
+
+// ==========================================
+// 2. AMBIENT AUDIO & VOICE ENGINE
 // ==========================================
 class AudioEngine {
     constructor() {
         this.ctx = null;
         this.osc1 = null; this.osc2 = null;
         this.isPlaying = false;
+        this.synth = window.speechSynthesis; 
+        this.femaleVoice = null;
+        this.voiceEnabled = localStorage.getItem(CONFIG.KEYS.VOICE) !== 'off';
+
+        const loadVoices = () => {
+            const voices = this.synth.getVoices();
+            this.femaleVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Female') || v.name.includes('Zira') || v.name.includes('Samantha') || v.name.includes('Victoria') || v.name.includes('Google'))) 
+                                 || voices.find(v => v.lang.startsWith('en'));
+        };
+
+        loadVoices();
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
     }
     
     init() {
@@ -50,11 +80,55 @@ class AudioEngine {
         btnElement.style.color = 'var(--neon-cyan)';
         lucide.createIcons();
     }
+
+    speak(text) {
+        if (!this.voiceEnabled) return;
+        this.synth.cancel(); 
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        utterance.rate = 1.0; 
+        utterance.pitch = 1.0; 
+        utterance.volume = 1.0;
+        utterance.lang = 'en-US'; 
+        
+        if (this.femaleVoice) {
+            utterance.voice = this.femaleVoice;
+        }
+        
+        this.synth.speak(utterance);
+    }
+
+    // Toggle Voice Implementation
+    toggleVoice(btnElement) {
+        this.voiceEnabled = !this.voiceEnabled;
+        localStorage.setItem(CONFIG.KEYS.VOICE, this.voiceEnabled ? 'on' : 'off');
+
+        if (!this.voiceEnabled) {
+            this.synth.cancel();
+        }
+
+        this.refreshVoiceButton(btnElement);
+        showToast(`Voice narration turned ${this.voiceEnabled ? 'ON' : 'OFF'}.`);
+    }
+
+    refreshVoiceButton(btnElement) {
+        if (!btnElement) return;
+        if (this.voiceEnabled) {
+            btnElement.classList.add('active');
+            btnElement.classList.remove('off');
+            btnElement.innerHTML = `<i data-lucide="volume-2" class="neon-icon"></i> Voice: ON`;
+        } else {
+            btnElement.classList.remove('active');
+            btnElement.classList.add('off');
+            btnElement.innerHTML = `<i data-lucide="volume-x"></i> Voice: OFF`;
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
 }
 const audioSys = new AudioEngine();
 
 // ==========================================
-// 2. CLOUD DATABASE (JSONBIN.IO - NO LOGIN)
+// 3. CLOUD DATABASE (JSONBIN.IO)
 // ==========================================
 const BIN_ID = "6a5e31a7da38895dfe7685d5"; 
 const API_KEY = "$2a$10$F0maGuUqRSceze6A.juiduAB4QpLrw9RUQGbMsHxwz5FFN11TtI1C"; 
@@ -64,23 +138,23 @@ let progress = [];
 let codeMap = {};
 
 // ==========================================
-// 3. AUDIT REPORT GENERATOR
+// 4. AUDIT REPORT GENERATOR
 // ==========================================
 function generateAuditLog() {
-    if (progress.length === 0) {
+    if (!Array.isArray(progress) || progress.length === 0) {
         showToast("No targets verified. Audit log empty.");
         return;
     }
     
     let report = `====================================================\n`;
     report += `BASE-C : SECURITY AUDIT TRAIL\n`;
-    report += `ARCHITECT   : PRIYANSHU SHIL\n`;
+    report += `ARCHITECT   : SYSTEM ARCHITECT\n`;
     report += `TIMESTAMP   : ${new Date().toISOString()}\n`;
     report += `VERIFIED    : ${progress.length} / 524\n`;
     report += `====================================================\n\n`;
 
     progress.forEach(id => {
-        const task = window.C_ASSIGNMENTS.find(t => t.id === id);
+        const task = C_ASSIGNMENTS.find(t => t.id === id);
         const code = codeMap[id] || "No code logged.";
         const hash = btoa(`secure_${id}_${code.length}`).substring(0, 16).toUpperCase();
         
@@ -102,7 +176,7 @@ function generateAuditLog() {
 }
 
 // ==========================================
-// 4. MAIN UI CONTROLLER
+// 5. MAIN UI CONTROLLER & AI STUDIO SWITCH
 // ==========================================
 let currentTask = null;
 const DOM = {
@@ -110,29 +184,60 @@ const DOM = {
     search: document.getElementById('search-input'),
     modal: document.getElementById('lab-modal'),
     audioBtn: document.getElementById('audio-toggle'),
+    voiceBtn: document.getElementById('voice-toggle'),
+    aiBtn: document.getElementById('ai-toggle'),
     exportBtn: document.getElementById('export-audit'),
     themeBtn: document.getElementById('theme-toggle'),
     cryptoScreen: document.getElementById('crypto-screen'),
     hashStream: document.getElementById('hash-stream')
 };
 
+// Toggle AI Studio Implementation
+function refreshAIButton(btnElement) {
+    if (!btnElement) return;
+    if (aiStudioEnabled) {
+        btnElement.classList.add('active');
+        btnElement.classList.remove('off');
+        btnElement.innerHTML = `<i data-lucide="bot" class="neon-icon"></i> AI Studio: ON`;
+    } else {
+        btnElement.classList.remove('active');
+        btnElement.classList.add('off');
+        btnElement.innerHTML = `<i data-lucide="bot-off"></i> AI Studio: OFF`;
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function toggleAIStudio(btnElement) {
+    aiStudioEnabled = !aiStudioEnabled;
+    localStorage.setItem(CONFIG.KEYS.AI_STUDIO, aiStudioEnabled ? 'on' : 'off');
+    refreshAIButton(btnElement);
+    showToast(`AI Studio turned ${aiStudioEnabled ? 'ON' : 'OFF'}.`);
+}
+
 async function init() {
     lucide.createIcons();
     
-    // FETCH FROM JSONBIN SILENTLY
+    renderGrid('all');
+    updateStats();
+    
     showToast("Syncing with cloud database...");
+    
     try {
         const response = await fetch(BIN_URL, {
             method: 'GET',
-            headers: {
-                'X-Master-Key': API_KEY // Fix: Use X-Master-Key instead of X-Access-Key
-            }
+            headers: { 'X-Master-Key': API_KEY }
         });
         
         if (response.ok) {
             const data = await response.json();
-            progress = data.record.progress || [];
-            codeMap = data.record.codeMap || {};
+            const cloudProgress = data?.record?.progress;
+            const cloudCodeMap = data?.record?.codeMap;
+            
+            progress = Array.isArray(cloudProgress) ? cloudProgress : [];
+            codeMap = (typeof cloudCodeMap === 'object' && cloudCodeMap !== null) ? cloudCodeMap : {};
+            
+            renderGrid(document.querySelector('.filter-btn.active')?.dataset.filter || 'all', DOM.search.value);
+            updateStats();
             showToast("Cloud sync complete.");
         } else {
             console.error("Failed to load data");
@@ -141,18 +246,16 @@ async function init() {
     } catch (err) {
         console.error("Cloud sync error:", err);
     }
-
-    renderGrid('all');
-    updateStats();
     
-    // Theme Initial Setup
     const currentTheme = localStorage.getItem('suraksha_theme') || 'dark';
     if (currentTheme === 'light') {
         DOM.themeBtn.innerHTML = `<i data-lucide="moon"></i> Dark Mode`;
         lucide.createIcons();
     }
 
-    // Bind Sidebar Filters
+    audioSys.refreshVoiceButton(DOM.voiceBtn);
+    refreshAIButton(DOM.aiBtn);
+
     document.querySelectorAll('.filter-btn').forEach(b => {
         b.addEventListener('click', (e) => {
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
@@ -165,7 +268,10 @@ async function init() {
     DOM.exportBtn.addEventListener('click', generateAuditLog);
     DOM.audioBtn.addEventListener('click', () => audioSys.toggleDrone(DOM.audioBtn));
     
-    // Theme Toggle Logic
+    // Binding the toggle events
+    DOM.voiceBtn.addEventListener('click', () => audioSys.toggleVoice(DOM.voiceBtn));
+    DOM.aiBtn.addEventListener('click', () => toggleAIStudio(DOM.aiBtn));
+    
     DOM.themeBtn.addEventListener('click', () => {
         const html = document.documentElement;
         const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
@@ -182,7 +288,6 @@ async function init() {
         showToast(`${newTheme.toUpperCase()} theme engaged.`);
     });
     
-    // Workspace listeners
     document.getElementById('close-modal').addEventListener('click', closeModal);
     document.getElementById('save-btn').addEventListener('click', triggerCryptoUnlock);
     
@@ -198,37 +303,45 @@ async function init() {
 
 function renderGrid(filter, search = "") {
     DOM.grid.innerHTML = '';
-    let data = window.C_ASSIGNMENTS || [];
     
-    if (filter === 'completed') data = data.filter(t => progress.includes(t.id));
-    if (filter === 'pending') data = data.filter(t => !progress.includes(t.id));
+    let data = C_ASSIGNMENTS; 
+    const safeProgress = Array.isArray(progress) ? progress : [];
+    
+    if (filter === 'completed') data = data.filter(t => safeProgress.includes(t.id));
+    if (filter === 'pending') data = data.filter(t => !safeProgress.includes(t.id));
     if (search) data = data.filter(t => t.title.toLowerCase().includes(search) || t.id.toString().includes(search));
 
     const frag = document.createDocumentFragment();
+    
+    const checkIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="neon-icon"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+    const circleIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>`;
+    const terminalIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><polyline points="8 10 12 14 8 18"></polyline><line x1="16" x2="20" y1="20" y2="20"></line></svg>`;
+
     data.forEach(task => {
-        const isDone = progress.includes(task.id);
+        const isDone = safeProgress.includes(task.id);
         const el = document.createElement('div');
         el.className = `task-card ${isDone ? 'completed' : ''}`;
         el.innerHTML = `
             <div class="task-header">
                 <span class="cat-tag font-mono">TARGET_ID // ${String(task.id).padStart(3, '0')}</span>
-                ${isDone ? '<i data-lucide="check-circle-2" class="neon-icon" style="width:20px;"></i>' : '<i data-lucide="circle" style="width:20px; color:var(--text-muted);"></i>'}
+                ${isDone ? checkIcon : circleIcon}
             </div>
             <h3>${task.title}</h3>
             <div class="task-footer">
                 <span class="neon-text" style="font-weight:600; font-size:0.85rem; display:flex; align-items:center; gap:5px;">
-                    Access Sandbox <i data-lucide="terminal-square" style="width:14px;"></i>
+                    Access Sandbox ${terminalIcon}
                 </span>
             </div>`;
         el.addEventListener('click', () => openModal(task.id));
         frag.appendChild(el);
     });
     DOM.grid.appendChild(frag);
-    lucide.createIcons();
 }
 
 function updateStats() {
-    const total = 524; const done = progress.length;
+    const safeProgress = Array.isArray(progress) ? progress : [];
+    const total = 524; 
+    const done = safeProgress.length;
     const perc = total ? Math.round((done/total)*100) : 0;
     document.getElementById('stat-completed').innerText = done;
     document.getElementById('stat-percent').innerText = `${perc}%`;
@@ -236,30 +349,23 @@ function updateStats() {
 }
 
 function openModal(id) {
-    currentTask = window.C_ASSIGNMENTS.find(t => t.id === id);
+    currentTask = C_ASSIGNMENTS.find(t => t.id === id);
     if (!currentTask) return;
     
     const fId = String(id).padStart(3, '0');
     document.getElementById('modal-task-title').innerText = `Target: #${fId}`;
     
     if (window.editor) {
-        const tpl = `/* TARGET ID: ${fId}\n * ARCHITECT: Priyanshu Shil\n */\n\n#include <stdio.h>\n\nint main() {\n    printf("Target System Initialized.\\n");\n    return 0;\n}`;
+        const tpl = `/* TARGET ID: ${fId}\n * ARCHITECT: System\n */\n\n#include <stdio.h>\n\nint main() {\n    printf("Target System Initialized.\\n");\n    return 0;\n}`;
         window.editor.setValue(codeMap[id] || tpl);
     }
     
     document.querySelector('[data-target="console"]').click();
     document.getElementById('terminal-out').innerHTML = `root@base-c:~# Target ${fId} loaded.<br/>root@base-c:~# Awaiting execution.`;
     document.getElementById('ai-chat').innerHTML = "";
-    initMemoryGrid();
     
     DOM.modal.classList.add('show');
-    
-    // Responsive Monaco Layout Fix
-    setTimeout(() => { 
-        if(window.editor) {
-            window.editor.layout(); 
-        }
-    }, 100);
+    setTimeout(() => { if(window.editor) window.editor.layout(); }, 100);
 }
 
 function closeModal() {
@@ -268,7 +374,7 @@ function closeModal() {
 }
 
 // ==========================================
-// 5. CRYPTOGRAPHIC PROGRESS UNLOCK
+// 6. CRYPTOGRAPHIC PROGRESS UNLOCK
 // ==========================================
 function triggerCryptoUnlock() {
     if (!currentTask || !window.editor) return;
@@ -298,17 +404,18 @@ async function finalizeSave() {
     const code = window.editor.getValue();
     codeMap[currentTask.id] = code;
     
+    if (!Array.isArray(progress)) progress = [];
+    
     if (!progress.includes(currentTask.id)) {
         progress.push(currentTask.id);
     }
 
-    // SILENTLY PUSH TO JSONBIN
     try {
         await fetch(BIN_URL, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Master-Key': API_KEY // Fix: Use X-Master-Key instead of X-Access-Key
+                'X-Master-Key': API_KEY 
             },
             body: JSON.stringify({ progress, codeMap })
         });
@@ -316,6 +423,7 @@ async function finalizeSave() {
         updateStats();
         renderGrid(document.querySelector('.filter-btn.active').dataset.filter, DOM.search.value);
         showToast("CTF Flag Accepted. Memory sector encrypted to cloud.");
+        audioSys.speak("Target secured. Database updated.");
     } catch (err) {
         console.error("Save failed:", err);
         showToast("ERROR: Could not sync to cloud.");
@@ -323,60 +431,94 @@ async function finalizeSave() {
 }
 
 // ==========================================
-// 6. LIVE MEMORY PROFILING & EXECUTION
+// 7. WANDBOX LIVE COMPILER & JOKE ENGINE
 // ==========================================
-function initMemoryGrid() {
-    const grid = document.getElementById('memory-grid');
-    grid.innerHTML = '';
-    for(let i=0; i<100; i++) {
-        let b = document.createElement('div');
-        b.className = 'mem-block';
-        grid.appendChild(b);
-    }
-    document.getElementById('mem-status').innerText = "STANDBY";
-    document.getElementById('mem-status').style.color = 'var(--neon-cyan)';
-}
-
 function attachCompilerEvents() {
-    document.getElementById('run-btn').addEventListener('click', () => {
+    const codingJokes = [
+        "Why do C programmers wear glasses? Because they can't C sharp!",
+        "I tried to tell a joke about a segmentation fault, but I lost my memory.",
+        "Why did the programmer quit his job? Because he didn't get arrays!",
+        "Even SURAKSHA AI cannot protect you from a missing semicolon!",
+        "C programmers never die. They are just cast into void.",
+        "A SQL query goes into a bar, walks up to two tables and asks: Can I join you? But since this is C, the bar just crashed.",
+        "My code doesn't work, and I don't know why. My code works, and I don't know why either!"
+    ];
+
+    document.getElementById('run-btn').addEventListener('click', async () => {
         document.querySelector('[data-target="console"]').click();
         const code = window.editor ? window.editor.getValue() : "";
         const term = document.getElementById('terminal-out');
+        const chat = document.getElementById('ai-chat');
         
-        term.innerHTML = `<br/><span style="color:var(--neon-cyan);">root@base-c:~# gcc -O3 -Wall source_main.c -o payload_bin</span>`;
+        term.innerHTML = `<br/><span style="color:var(--neon-cyan);">root@base-c:~# gcc -O3 -Wall source_main.c -o payload_bin</span><br/><span style="color:var(--text-muted);">Compiling on Wandbox server...</span>`;
         
-        setTimeout(() => {
-            document.querySelector('[data-target="memory"]').click(); 
-            const blocks = document.querySelectorAll('.mem-block');
-            const status = document.getElementById('mem-status');
-            
-            let isDanger = code.includes('gets(') || code.includes('strcpy');
-            status.innerText = "ALLOCATING MEMORY...";
-            
-            blocks.forEach((b, i) => {
-                setTimeout(() => {
-                    b.classList.add(isDanger ? 'active-danger' : 'active-safe');
-                    if (i === blocks.length - 1) {
-                        status.innerText = isDanger ? "BUFFER OVERFLOW DETECTED" : "MEMORY SECURE";
-                        status.style.color = isDanger ? 'var(--neon-red)' : 'var(--neon-green)';
-                        showToast(isDanger ? "Execution failed due to core dump." : "Execution complete.");
-                    }
-                }, i * 15); 
+        try {
+            const response = await fetch('https://wandbox.org/api/compile.json', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    compiler: 'gcc-head-c', 
+                    code: code,
+                    save: false
+                })
             });
-        }, 500);
+
+            const data = await response.json();
+
+            if (data.status == 0) {
+                const output = data.program_output || data.compiler_message || "";
+                term.innerHTML += `<br/><br/><span style="color:var(--neon-green);">${output.replace(/\n/g, '<br/>')}</span>`;
+                term.innerHTML += `<br/><span style="color:var(--neon-cyan);">root@base-c:~# Execution complete.</span>`;
+                audioSys.speak("Compilation successful. Code executed perfectly.");
+            } else {
+                const fullError = data.compiler_error || data.program_error || "Unknown compilation error.";
+                term.innerHTML += `<br/><br/><span style="color:var(--neon-red);">${fullError.replace(/\n/g, '<br/>')}</span>`;
+                term.innerHTML += `<br/><span style="color:var(--neon-red);">root@base-c:~# Execution Failed.</span>`;
+                
+                let lineMatch = fullError.match(/prog\.c:(\d+)/);
+                let textLineInfo = lineMatch ? `It looks like you messed up on line ${lineMatch[1]}. ` : "I found some syntax errors in your C code. ";
+                
+                let errorMatch = fullError.match(/error:\s*([^\n]+)/i);
+                let specificError = errorMatch ? `The specific error is: ${errorMatch[1]}. ` : "";
+                
+                let randomJoke = codingJokes[Math.floor(Math.random() * codingJokes.length)];
+                let voiceMessage = "Compilation failed. " + textLineInfo + specificError + randomJoke;
+                
+                if (aiStudioEnabled) {
+                    document.querySelector('[data-target="ai"]').click();
+                    chat.innerHTML = `
+                        <div class="ai-msg system">
+                            <h5><i data-lucide="shield-alert" style="color:var(--neon-red);"></i> System Profiler</h5>
+                            <p style="color:var(--neon-red); font-size:0.9rem;">${textLineInfo} <br/> ${specificError}</p>
+                            <p style="color:var(--text-main); font-style: italic; margin-top: 10px;">"${randomJoke}"</p>
+                        </div>`;
+                    lucide.createIcons();
+                }
+                audioSys.speak(voiceMessage);
+            }
+
+        } catch (error) {
+            term.innerHTML += `<br/><span style="color:var(--neon-red);">root@base-c:~# API Error: Cloud compiler offline.</span>`;
+            audioSys.speak("Error. Cannot connect to the compiler server.");
+        }
     });
 
     document.getElementById('ai-scan-btn').addEventListener('click', () => {
+        if (!aiStudioEnabled) {
+            showToast("AI Studio is OFF. Enable it in System Tools to run a scan.");
+            return;
+        }
         document.querySelector('[data-target="ai"]').click();
         const chat = document.getElementById('ai-chat');
         const code = window.editor ? window.editor.getValue() : "";
         
         chat.innerHTML = `<div class="ai-msg system"><h5><i data-lucide="shield-check"></i> System Profiler</h5><p style="color:var(--text-muted); font-size:0.8rem;">Analyzing Abstract Syntax Tree...</p></div>`;
         lucide.createIcons();
+        audioSys.speak("Initiating AI scan on source code.");
         
         setTimeout(() => {
             let msg = code.includes('gets(') ? "CRITICAL: gets() detected. Buffer overflow risk." : 
-                      !code.includes('#include <stdio.h>') ? "ERROR: Missing <stdio.h> library." : 
+                      !code.includes('#include <stdio.h>') ? "ERROR: Missing standard input output library." : 
                       "VERIFIED: Code architecture is secure.";
             let color = code.includes('gets(') || !code.includes('#include') ? 'var(--neon-red)' : 'var(--neon-green)';
             let icon = color === 'var(--neon-green)' ? "shield" : "alert-triangle";
@@ -384,7 +526,8 @@ function attachCompilerEvents() {
             chat.innerHTML += `<div class="ai-msg" style="border-left: 3px solid ${color};"><h5><i data-lucide="${icon}" style="color:${color};"></i> Profiler Result</h5><p>${msg}</p></div>`;
             lucide.createIcons();
             chat.parentElement.scrollTop = chat.parentElement.scrollHeight;
-        }, 1000);
+            audioSys.speak(msg);
+        }, 1500);
     });
 }
 
@@ -398,12 +541,11 @@ function showToast(msg) {
 }
 
 // ==========================================
-// 7. RESPONSIVE VIEWPORT ENGINE
+// 8. RESPONSIVE VIEWPORT ENGINE
 // ==========================================
 class ViewportMonitor {
     constructor() {
         this.checkScreen();
-        // Listen for screen size changes in real-time
         window.addEventListener('resize', () => this.checkScreen());
     }
 
@@ -419,7 +561,6 @@ class ViewportMonitor {
             html.setAttribute('data-device', 'desktop');
         }
 
-        // Force Monaco editor to resize if it's currently open during a window resize
         if (window.editor && document.getElementById('lab-modal').classList.contains('show')) {
             window.editor.layout();
         }
@@ -431,9 +572,4 @@ const viewportSys = new ViewportMonitor();
 window.addEventListener('DOMContentLoaded', () => {
     init();
     attachCompilerEvents();
-    
-    // Fallback force initialization for icons
-    if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-    }
 });
