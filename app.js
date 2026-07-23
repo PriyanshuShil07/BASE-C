@@ -15,7 +15,6 @@ const CONFIG = {
     COLORS: { CYAN: '#00f0ff', GREEN: '#10b981', RED: '#ef4444', MUTED: '#8b949e' }
 };
 
-// Read saved on/off preferences (default: both ON, matching the markup)
 let aiStudioEnabled = localStorage.getItem(CONFIG.KEYS.AI_STUDIO) !== 'off';
 
 // ==========================================
@@ -195,8 +194,6 @@ const DOM = {
     aiBtn: document.getElementById('ai-toggle'),
     exportBtn: document.getElementById('export-audit'),
     themeBtn: document.getElementById('theme-toggle'),
-    cryptoScreen: document.getElementById('crypto-screen'),
-    hashStream: document.getElementById('hash-stream'),
     menuToggle: document.getElementById('menu-toggle'),
     sidebarBackdrop: document.getElementById('sidebar-backdrop')
 };
@@ -377,27 +374,73 @@ function closeModal() {
     currentTask = null; 
 }
 
+// ==========================================
+// 6. IRON MAN NANOTECH PROGRESS UNLOCK
+// ==========================================
 function triggerCryptoUnlock() {
-    if (!currentTask || !window.editor) return;
-    DOM.cryptoScreen.classList.add('active');
+    const cryptoScreen = document.getElementById('crypto-screen');
+    const cryptoTitle = document.getElementById('crypto-title');
+    const hashStream = document.getElementById('hash-stream');
+    const nanoContainer = document.getElementById('nano-particles');
+
+    if (!currentTask || !window.editor || !cryptoScreen) return;
     
+    // Activate the Iron Man Nanotech overlay
+    cryptoScreen.classList.add('active');
+    cryptoScreen.classList.add('iron-man-nano');
+    
+    if (cryptoTitle) cryptoTitle.innerText = "ASSEMBLING NANOTECH ARMOR...";
+    
+    // Spawn Hexagonal Nanobots dynamically
+    if (nanoContainer) {
+        nanoContainer.innerHTML = '';
+        for (let i = 0; i < 120; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'nano-bot';
+            // Randomize spawn locations across the screen
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.top = Math.random() * 100 + '%';
+            // Randomize the start time so they swarm in waves
+            particle.style.animationDelay = (Math.random() * 0.8) + 's';
+            nanoContainer.appendChild(particle);
+        }
+    }
+
+    if(typeof audioSys !== 'undefined') {
+        audioSys.speak("Nanotech armor assembly initiated.");
+    }
+    
+    // Generate the Mark 85 Hash Stream
     let interval = setInterval(() => {
-        let hash = '0x'; 
+        let hash = 'MARK_85_';
         for(let i=0; i<8; i++) hash += Math.floor(Math.random()*16).toString(16).toUpperCase();
-        DOM.hashStream.innerText = hash;
+        if (hashStream) hashStream.innerText = hash;
     }, 50);
 
+    // Conclude animation
     setTimeout(() => {
         clearInterval(interval);
-        DOM.hashStream.innerText = "ACCESS GRANTED"; 
-        DOM.hashStream.style.color = 'var(--neon-green)';
+        if (hashStream) {
+            hashStream.innerText = "ARMOR SECURED"; 
+            hashStream.style.color = 'var(--iron-gold)';
+        }
+        
+        if(typeof audioSys !== 'undefined') {
+            audioSys.speak("Target secured. System updated.");
+        }
         
         setTimeout(() => {
-            DOM.cryptoScreen.classList.remove('active'); 
-            DOM.hashStream.style.color = 'var(--neon-cyan)'; 
+            // Clean up and save
+            cryptoScreen.classList.remove('active'); 
+            cryptoScreen.classList.remove('iron-man-nano');
+            
+            if (hashStream) hashStream.style.color = 'var(--neon-cyan)'; 
+            if (cryptoTitle) cryptoTitle.innerText = "ENCRYPTING MEMORY SECTOR...";
+            if (nanoContainer) nanoContainer.innerHTML = ''; // clear bots to save memory
+            
             finalizeSave();
-        }, 500);
-    }, 1200);
+        }, 1200);
+    }, 2500); // 2.5 seconds to let the nanobots fully animate
 }
 
 async function finalizeSave() {
@@ -438,7 +481,7 @@ function showToast(msg) {
 }
 
 // ==========================================
-// 5. INTERACTIVE TERMINAL & SYSTEM COMPILER
+// 7. INTERACTIVE TERMINAL & SYSTEM COMPILER
 // ==========================================
 function attachTerminalAndCompilerEvents() {
     const termInput = document.getElementById('terminal-input');
@@ -616,9 +659,20 @@ function attachTerminalAndCompilerEvents() {
                 termOut.innerHTML += `<br/><br/><span style="color:var(--neon-red);">${fullError.replace(/\n/g, '<br/>')}</span>`;
                 termOut.innerHTML += `<br/><span style="color:var(--neon-red);">${promptPrefix.innerText} Execution Failed.</span>`;
                 
-                // AI Diagnosis formatting
+                // Smarter AI Diagnosis formatting (prevents false "Syntax Error" claims)
                 let lineMatch = fullError.match(/prog\.c:(\d+)/);
-                let textLineInfo = lineMatch ? `Error on line ${lineMatch[1]}. ` : "Syntax errors found. ";
+                let textLineInfo = "";
+                
+                if (lineMatch) {
+                    textLineInfo = `Error located on line ${lineMatch[1]}. `;
+                } else if (data.program_error) {
+                    textLineInfo = "Runtime execution error or segmentation fault detected. ";
+                } else if (fullError.includes("undefined reference")) {
+                    textLineInfo = "Linker error: Undefined reference to a function. ";
+                } else {
+                    textLineInfo = "Compilation failed. ";
+                }
+
                 let randomJoke = codingJokes[Math.floor(Math.random() * codingJokes.length)];
                 
                 if (aiStudioEnabled) {
@@ -631,7 +685,7 @@ function attachTerminalAndCompilerEvents() {
                         </div>`;
                     lucide.createIcons();
                 }
-                if(typeof audioSys !== 'undefined') audioSys.speak("Compilation failed. " + textLineInfo);
+                if(typeof audioSys !== 'undefined') audioSys.speak("Execution failed. " + textLineInfo);
             }
         } catch (error) {
             termOut.innerHTML += `<br/><span style="color:var(--neon-red);">root@base-c:~# API Error: Cloud compiler offline.</span>`;
