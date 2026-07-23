@@ -15,6 +15,7 @@ const CONFIG = {
     COLORS: { CYAN: '#00f0ff', GREEN: '#10b981', RED: '#ef4444', MUTED: '#8b949e' }
 };
 
+// Read saved on/off preferences (default: both ON, matching the markup)
 let aiStudioEnabled = localStorage.getItem(CONFIG.KEYS.AI_STUDIO) !== 'off';
 
 // ==========================================
@@ -26,7 +27,7 @@ if (C_ASSIGNMENTS.length === 0) {
 }
 
 // ==========================================
-// 2. AUDIO & VOICE ENGINE
+// 2. AMBIENT AUDIO & INDIAN VOICE ENGINE
 // ==========================================
 class AudioEngine {
     constructor() {
@@ -35,16 +36,24 @@ class AudioEngine {
         this.osc2 = null;
         this.isPlaying = false;
         this.synth = window.speechSynthesis; 
-        this.femaleVoice = null;
+        this.activeVoice = null;
         this.voiceEnabled = localStorage.getItem(CONFIG.KEYS.VOICE) !== 'off';
 
         const loadVoices = () => {
             const voices = this.synth.getVoices();
-            this.femaleVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Female') || v.name.includes('Zira') || v.name.includes('Samantha'))) 
-                            || voices.find(v => v.lang.startsWith('en'));
+            
+            // Priority 1: Premium Indian English (Google Cloud, Microsoft Natural)
+            this.activeVoice = voices.find(v => v.lang.includes('en-IN') && (v.name.includes('Natural') || v.name.includes('Online') || v.name.includes('Google')))
+            // Priority 2: Standard Local Indian English
+            || voices.find(v => v.lang.includes('en-IN'))
+            // Priority 3: Premium Global English (Fallback)
+            || voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha')))
+            // Priority 4: Basic English (Ultimate Fallback)
+            || voices.find(v => v.lang.startsWith('en'));
         };
 
         loadVoices();
+        // Chrome/Edge load voices asynchronously, so we must listen for the change event
         if (speechSynthesis.onvoiceschanged !== undefined) {
             speechSynthesis.onvoiceschanged = loadVoices;
         }
@@ -92,12 +101,16 @@ class AudioEngine {
         if (!this.voiceEnabled) return;
         this.synth.cancel(); 
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.0; 
+        
+        // Slightly slow down the rate for better, more natural articulation
+        utterance.rate = 0.95; 
         utterance.pitch = 1.0; 
         utterance.volume = 1.0; 
-        utterance.lang = 'en-US'; 
         
-        if (this.femaleVoice) utterance.voice = this.femaleVoice;
+        // Crucial: Set the phonetic engine to Indian English
+        utterance.lang = this.activeVoice ? this.activeVoice.lang : 'en-IN'; 
+        
+        if (this.activeVoice) utterance.voice = this.activeVoice;
         this.synth.speak(utterance);
     }
 
@@ -215,14 +228,25 @@ async function init() {
     lucide.createIcons();
     renderGrid('all');
     updateStats();
+    
+    // Load local storage first for instant render
+    progress = JSON.parse(localStorage.getItem('local_progress')) || [];
+    codeMap = JSON.parse(localStorage.getItem('local_codeMap')) || {};
+    renderGrid(document.querySelector('.filter-btn.active')?.dataset.filter || 'all', DOM.search.value);
+    updateStats();
+    
     showToast("Syncing with cloud database...");
     
     try {
         const response = await fetch(BIN_URL, { method: 'GET', headers: { 'X-Master-Key': API_KEY } });
         if (response.ok) {
             const data = await response.json();
-            progress = Array.isArray(data?.record?.progress) ? data.record.progress : [];
-            codeMap = (typeof data?.record?.codeMap === 'object' && data.record.codeMap !== null) ? data.record.codeMap : {};
+            progress = Array.isArray(data?.record?.progress) ? data.record.progress : progress;
+            codeMap = (typeof data?.record?.codeMap === 'object' && data.record.codeMap !== null) ? data.record.codeMap : codeMap;
+            
+            // Sync local cache
+            localStorage.setItem('local_progress', JSON.stringify(progress));
+            localStorage.setItem('local_codeMap', JSON.stringify(codeMap));
             
             renderGrid(document.querySelector('.filter-btn.active')?.dataset.filter || 'all', DOM.search.value);
             updateStats();
@@ -383,17 +407,21 @@ async function finalizeSave() {
     if (!Array.isArray(progress)) progress = [];
     if (!progress.includes(currentTask.id)) progress.push(currentTask.id);
 
+    // Save to local storage first for instant feeling
+    localStorage.setItem('local_progress', JSON.stringify(progress));
+    localStorage.setItem('local_codeMap', JSON.stringify(codeMap));
+    updateStats(); 
+    renderGrid(document.querySelector('.filter-btn.active').dataset.filter, DOM.search.value);
+    showToast("CTF Flag Accepted. Memory sector encrypted to cloud.");
+
     try {
         await fetch(BIN_URL, { 
             method: 'PUT', 
             headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY }, 
             body: JSON.stringify({ progress, codeMap }) 
         });
-        updateStats(); 
-        renderGrid(document.querySelector('.filter-btn.active').dataset.filter, DOM.search.value);
-        showToast("CTF Flag Accepted. Memory sector encrypted to cloud.");
     } catch (err) { 
-        showToast("ERROR: Could not sync to cloud."); 
+        showToast("ERROR: Could not sync to cloud, but data is saved locally."); 
     }
 }
 
