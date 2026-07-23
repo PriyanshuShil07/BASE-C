@@ -141,11 +141,13 @@
     <div class="workspace-overlay" id="lab-modal">
         <div class="workspace-glass">
             
-            <!-- Cryptographic Unlock Animation Overlay -->
+            <!-- Cryptographic Unlock / Iron Man Nanotech Overlay -->
             <div class="crypto-overlay" id="crypto-screen">
-                <i data-lucide="lock" class="neon-icon" style="width: 48px; height: 48px; margin-bottom: 20px;"></i>
-                <h2 class="font-mono" style="color:var(--text-main);">ENCRYPTING MEMORY SECTOR...</h2>
-                <div class="hash-stream font-mono" id="hash-stream">0x00000000</div>
+                <div id="nano-particles"></div>
+                
+                <i data-lucide="shield" class="neon-icon lock-icon" style="width: 56px; height: 56px; margin-bottom: 20px; z-index: 10;"></i>
+                <h2 class="font-mono" id="crypto-title" style="color:var(--text-main); z-index: 10;">ENCRYPTING MEMORY SECTOR...</h2>
+                <div class="hash-stream font-mono" id="hash-stream" style="z-index: 10;">0x00000000</div>
             </div>
 
             <header class="workspace-header">
