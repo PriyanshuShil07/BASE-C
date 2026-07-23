@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Prevents auto-zooming on mobile inputs -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Base-C | Execution Environment</title>
     
     <!-- Premium Fonts -->
@@ -14,7 +15,9 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
+    <!-- Stylesheets -->
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="jarvis.css">
     
     <!-- Theme Pre-load to prevent flashing -->
     <script>
@@ -177,7 +180,14 @@
                     </div>
                     
                     <div class="pane-content active" id="console-view">
-                        <div class="terminal-text font-mono" id="terminal-out">root@base-c:~# System ready. Awaiting payload.</div>
+                        <div class="terminal-text font-mono" id="terminal-out">
+                            <span style="color:var(--neon-cyan);">root@base-c:~#</span> System initialization complete.<br/>
+                            <span style="color:var(--text-muted);">Please enter your user designation (Name):</span>
+                        </div>
+                        <div class="terminal-input-line font-mono">
+                            <span class="prompt-prefix" id="prompt-prefix">root@base-c:~#</span>
+                            <input type="text" id="terminal-input" autocomplete="off" autofocus placeholder="Enter your name...">
+                        </div>
                     </div>
                     
                     <div class="pane-content" id="ai-view">
@@ -231,5 +241,9 @@
             lucide.createIcons();
         }
     </script>
+
+    <!-- JARVIS Logic Engine -->
+    <script src="jarvis.js"></script>
+    
 </body>
 </html>
