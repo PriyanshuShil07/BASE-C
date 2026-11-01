@@ -295,6 +295,7 @@ async function init() {
     // Modal Management
     document.getElementById('close-modal').addEventListener('click', closeModal);
     document.getElementById('save-btn').addEventListener('click', triggerCryptoUnlock);
+    document.getElementById('print-btn').addEventListener('click', printCurrentTask);
     
     // Pane Tabs
     document.querySelectorAll('.tab-btn').forEach(b => {
@@ -372,6 +373,59 @@ function openModal(id) {
 function closeModal() { 
     DOM.modal.classList.remove('show'); 
     currentTask = null; 
+}
+
+function printCurrentTask() {
+    if (!currentTask) {
+        showToast("No target selected to print.");
+        return;
+    }
+
+    const code = window.editor ? window.editor.getValue() : "No source code available.";
+    const terminalContent = document.getElementById('terminal-out').innerText;
+    
+    const printWindow = window.open('', '_blank');
+    
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Target #${String(currentTask.id).padStart(3, '0')} - BASE-C</title>
+            <style>
+                body { font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.5; padding: 30px; color: #000; max-width: 800px; margin: 0 auto; }
+                h1 { font-size: 22px; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+                h2 { font-size: 16px; margin-top: 25px; color: #444; text-transform: uppercase; letter-spacing: 1px; }
+                pre { 
+                    background: #f8f9fa; 
+                    padding: 15px; 
+                    border: 1px solid #e2e8f0; 
+                    border-radius: 6px; 
+                    white-space: pre-wrap; 
+                    word-wrap: break-word; 
+                    font-family: 'JetBrains Mono', monospace; 
+                    font-size: 13px; 
+                }
+                .terminal-output { background: #111; color: #10b981; border: 1px solid #000; }
+                @media print { body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+            <h1>Target #${String(currentTask.id).padStart(3, '0')}: ${currentTask.title}</h1>
+            <h2>Source Code</h2>
+            <pre>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+            <h2>Terminal Output</h2>
+            <pre class="terminal-output">${terminalContent.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+        </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.focus();
+    
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 250);
 }
 
 // ==========================================
