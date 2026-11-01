@@ -2,7 +2,6 @@
  * ==========================================================================
  * BASE-C | CORE SYSTEM LOGIC
  * ==========================================================================
- * Systematic Execution Engine & Interactive Terminal Controller
  */
 
 const CONFIG = {
@@ -16,6 +15,7 @@ const CONFIG = {
 };
 
 let aiStudioEnabled = localStorage.getItem(CONFIG.KEYS.AI_STUDIO) !== 'off';
+let currentOS = 'mac'; // Global OS state tracker
 
 // ==========================================
 // 1. DATA INITIALIZATION
@@ -40,19 +40,13 @@ class AudioEngine {
 
         const loadVoices = () => {
             const voices = this.synth.getVoices();
-            
-            // Priority 1: Premium Indian English (Google Cloud, Microsoft Natural)
             this.activeVoice = voices.find(v => v.lang.includes('en-IN') && (v.name.includes('Natural') || v.name.includes('Online') || v.name.includes('Google')))
-            // Priority 2: Standard Local Indian English
             || voices.find(v => v.lang.includes('en-IN'))
-            // Priority 3: Premium Global English (Fallback)
             || voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha')))
-            // Priority 4: Basic English (Ultimate Fallback)
             || voices.find(v => v.lang.startsWith('en'));
         };
 
         loadVoices();
-        // Chrome/Edge load voices asynchronously, so we must listen for the change event
         if (speechSynthesis.onvoiceschanged !== undefined) {
             speechSynthesis.onvoiceschanged = loadVoices;
         }
@@ -100,15 +94,10 @@ class AudioEngine {
         if (!this.voiceEnabled) return;
         this.synth.cancel(); 
         const utterance = new SpeechSynthesisUtterance(text);
-        
-        // Slightly slow down the rate for better, more natural articulation
         utterance.rate = 0.95; 
         utterance.pitch = 1.0; 
         utterance.volume = 1.0; 
-        
-        // Crucial: Set the phonetic engine to Indian English
         utterance.lang = this.activeVoice ? this.activeVoice.lang : 'en-IN'; 
-        
         if (this.activeVoice) utterance.voice = this.activeVoice;
         this.synth.speak(utterance);
     }
@@ -226,7 +215,6 @@ async function init() {
     renderGrid('all');
     updateStats();
     
-    // Load local storage first for instant render
     progress = JSON.parse(localStorage.getItem('local_progress')) || [];
     codeMap = JSON.parse(localStorage.getItem('local_codeMap')) || {};
     renderGrid(document.querySelector('.filter-btn.active')?.dataset.filter || 'all', DOM.search.value);
@@ -241,7 +229,6 @@ async function init() {
             progress = Array.isArray(data?.record?.progress) ? data.record.progress : progress;
             codeMap = (typeof data?.record?.codeMap === 'object' && data.record.codeMap !== null) ? data.record.codeMap : codeMap;
             
-            // Sync local cache
             localStorage.setItem('local_progress', JSON.stringify(progress));
             localStorage.setItem('local_codeMap', JSON.stringify(codeMap));
             
@@ -262,7 +249,6 @@ async function init() {
     audioSys.refreshVoiceButton(DOM.voiceBtn);
     refreshAIButton(DOM.aiBtn);
 
-    // Filter Buttons
     document.querySelectorAll('.filter-btn').forEach(b => {
         b.addEventListener('click', (e) => {
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
@@ -272,7 +258,6 @@ async function init() {
         });
     });
 
-    // Sidebar & Global Events
     DOM.menuToggle.addEventListener('click', toggleSidebar);
     DOM.sidebarBackdrop.addEventListener('click', closeSidebar);
     DOM.search.addEventListener('input', e => renderGrid(document.querySelector('.filter-btn.active').dataset.filter, e.target.value.toLowerCase()));
@@ -281,7 +266,6 @@ async function init() {
     DOM.voiceBtn.addEventListener('click', () => audioSys.toggleVoice(DOM.voiceBtn));
     DOM.aiBtn.addEventListener('click', () => toggleAIStudio(DOM.aiBtn));
     
-    // Theme Toggle
     DOM.themeBtn.addEventListener('click', () => {
         const html = document.documentElement;
         const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
@@ -292,12 +276,11 @@ async function init() {
         if (window.editor) monaco.editor.setTheme(newTheme === 'light' ? 'vs' : 'vs-dark');
     });
     
-    // Modal Management
     document.getElementById('close-modal').addEventListener('click', closeModal);
     document.getElementById('save-btn').addEventListener('click', triggerCryptoUnlock);
     document.getElementById('print-btn').addEventListener('click', printCurrentTask);
+    document.getElementById('batch-print-btn').addEventListener('click', handleBatchPrint);
     
-    // Pane Tabs
     document.querySelectorAll('.tab-btn').forEach(b => {
         b.addEventListener('click', (e) => {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -395,16 +378,7 @@ function printCurrentTask() {
                 body { font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.5; padding: 30px; color: #000; max-width: 800px; margin: 0 auto; }
                 h1 { font-size: 22px; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
                 h2 { font-size: 16px; margin-top: 25px; color: #444; text-transform: uppercase; letter-spacing: 1px; }
-                pre { 
-                    background: #f8f9fa; 
-                    padding: 15px; 
-                    border: 1px solid #e2e8f0; 
-                    border-radius: 6px; 
-                    white-space: pre-wrap; 
-                    word-wrap: break-word; 
-                    font-family: 'JetBrains Mono', monospace; 
-                    font-size: 13px; 
-                }
+                pre { background: #f8f9fa; padding: 15px; border: 1px solid #e2e8f0; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
                 .terminal-output { background: #111; color: #10b981; border: 1px solid #000; }
                 @media print { body { padding: 0; } }
             </style>
@@ -428,6 +402,79 @@ function printCurrentTask() {
     }, 250);
 }
 
+function handleBatchPrint() {
+    const safeProgress = Array.isArray(progress) ? progress : [];
+    
+    if (safeProgress.length === 0) {
+        showToast("No completed targets available to print.");
+        return;
+    }
+    
+    const inputField = document.getElementById('batch-count');
+    const count = parseInt(inputField.value);
+    
+    if (isNaN(count) || count <= 0) {
+        showToast("Please type a valid number of programs to print.");
+        inputField.focus();
+        return; 
+    }
+    
+    const finalCount = count > safeProgress.length ? safeProgress.length : count;
+    const targetsToPrint = safeProgress.slice(0, finalCount);
+    
+    // Formatting simulated output text based on chosen OS environment
+    const executionText = currentOS === 'win' ? `C:\\Users\\priyanshu> .\\payload.exe\n[System] Execution successful.` : `priyanshu@MacBook-Pro ~ % ./payload_bin\n[System] Code executed successfully.`;
+
+    let printHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>BASE-C Batch Print (${finalCount} Targets)</title>
+            <style>
+                body { font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.5; padding: 30px; color: #000; max-width: 800px; margin: 0 auto; }
+                .task-page { page-break-after: always; margin-bottom: 40px; }
+                .task-page:last-child { page-break-after: auto; }
+                h1 { font-size: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+                h2 { font-size: 14px; margin-top: 25px; color: #444; text-transform: uppercase; letter-spacing: 1px; }
+                pre { background: #f8f9fa; padding: 15px; border: 1px solid #e2e8f0; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+                .terminal-output { background: #111; color: #10b981; border: 1px solid #000; }
+                @media print { body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+    `;
+    
+    targetsToPrint.forEach(id => {
+        const task = C_ASSIGNMENTS.find(t => t.id === id);
+        const code = codeMap[id] || "// No source code saved in memory.";
+        
+        printHTML += `
+            <div class="task-page">
+                <h1>Target #${String(task.id).padStart(3, '0')}: ${task.title}</h1>
+                <h2>Source Code</h2>
+                <pre>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                <h2>Terminal Output</h2>
+                <pre class="terminal-output">${executionText}</pre>
+            </div>
+        `;
+    });
+    
+    printHTML += `</body></html>`;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printHTML);
+    printWindow.document.close();
+    printWindow.focus();
+    
+    showToast(`Generating print document for ${finalCount} targets...`);
+    
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+        inputField.value = ''; 
+    }, 250);
+}
+
 // ==========================================
 // 6. IRON MAN NANOTECH PROGRESS UNLOCK
 // ==========================================
@@ -439,39 +486,31 @@ function triggerCryptoUnlock() {
 
     if (!currentTask || !window.editor || !cryptoScreen) return;
     
-    // Activate the Iron Man Nanotech overlay
     cryptoScreen.classList.add('active');
     cryptoScreen.classList.add('iron-man-nano');
     
     if (cryptoTitle) cryptoTitle.innerText = "ASSEMBLING NANOTECH ARMOR...";
     
-    // Spawn Hexagonal Nanobots dynamically
     if (nanoContainer) {
         nanoContainer.innerHTML = '';
         for (let i = 0; i < 120; i++) {
             const particle = document.createElement('div');
             particle.className = 'nano-bot';
-            // Randomize spawn locations across the screen
             particle.style.left = Math.random() * 100 + '%';
             particle.style.top = Math.random() * 100 + '%';
-            // Randomize the start time so they swarm in waves
             particle.style.animationDelay = (Math.random() * 0.8) + 's';
             nanoContainer.appendChild(particle);
         }
     }
 
-    if(typeof audioSys !== 'undefined') {
-        audioSys.speak("Nanotech armor assembly initiated.");
-    }
+    if(typeof audioSys !== 'undefined') audioSys.speak("Nanotech armor assembly initiated.");
     
-    // Generate the Mark 85 Hash Stream
     let interval = setInterval(() => {
         let hash = 'MARK_85_';
         for(let i=0; i<8; i++) hash += Math.floor(Math.random()*16).toString(16).toUpperCase();
         if (hashStream) hashStream.innerText = hash;
     }, 50);
 
-    // Conclude animation
     setTimeout(() => {
         clearInterval(interval);
         if (hashStream) {
@@ -479,22 +518,19 @@ function triggerCryptoUnlock() {
             hashStream.style.color = 'var(--iron-gold)';
         }
         
-        if(typeof audioSys !== 'undefined') {
-            audioSys.speak("Target secured. System updated.");
-        }
+        if(typeof audioSys !== 'undefined') audioSys.speak("Target secured. System updated.");
         
         setTimeout(() => {
-            // Clean up and save
             cryptoScreen.classList.remove('active'); 
             cryptoScreen.classList.remove('iron-man-nano');
             
             if (hashStream) hashStream.style.color = 'var(--neon-cyan)'; 
             if (cryptoTitle) cryptoTitle.innerText = "ENCRYPTING MEMORY SECTOR...";
-            if (nanoContainer) nanoContainer.innerHTML = ''; // clear bots to save memory
+            if (nanoContainer) nanoContainer.innerHTML = ''; 
             
             finalizeSave();
         }, 1200);
-    }, 2500); // 2.5 seconds to let the nanobots fully animate
+    }, 2500); 
 }
 
 async function finalizeSave() {
@@ -504,7 +540,6 @@ async function finalizeSave() {
     if (!Array.isArray(progress)) progress = [];
     if (!progress.includes(currentTask.id)) progress.push(currentTask.id);
 
-    // Save to local storage first for instant feeling
     localStorage.setItem('local_progress', JSON.stringify(progress));
     localStorage.setItem('local_codeMap', JSON.stringify(codeMap));
     updateStats(); 
@@ -544,14 +579,15 @@ function attachTerminalAndCompilerEvents() {
     const promptPrefix = document.getElementById('prompt-prefix');
     const chat = document.getElementById('ai-chat');
 
-    // Terminal State Machine:
-    // 0 = Initializing (Asking for User Name)
-    // 1 = Idle (Awaiting UI interaction)
-    // 2 = Awaiting Standard Input (STDIN) for C Compilation
+    // Terminal State Machine
+    // 0 = Boot Sequence OS Selection (Mac or Win)
+    // 1 = Name Collection
+    // 2 = Idle (Awaiting code compilation)
+    // 3 = STDIN Input capture for C logic
     let terminalState = 0; 
     let userName = "";
     let pendingCode = "";
-    let stdInBuffer = ""; // Buffer to store multiple inputs
+    let stdInBuffer = ""; 
 
     const codingJokes = [
         "Why do C programmers wear glasses? Because they can't C sharp!",
@@ -559,78 +595,86 @@ function attachTerminalAndCompilerEvents() {
         "A SQL query goes into a bar, walks up to two tables and asks: Can I join you? But since this is C, the bar just crashed."
     ];
 
-    // --- A. Handle Terminal Keypresses (Command Line Interface) ---
     termInput.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') {
             const command = this.value; 
             this.value = '';
 
-            // Echo input (unless it's an empty submission for STDIN completion)
-            if (terminalState !== 2 || command.trim() !== "") {
+            if (terminalState !== 3 || command.trim() !== "") {
                 termOut.innerHTML += `<br/><span style="color:var(--neon-cyan);">${promptPrefix.innerText} ${command}</span>`;
             }
 
-            // Global Clear Command
             if (command.trim().toLowerCase() === 'clear') {
                 termOut.innerHTML = `<span style="color:var(--neon-cyan);">${promptPrefix.innerText}</span> Terminal cleared.`;
                 return;
             }
 
-            // STATE 0: Name Collection
+            // STATE 0: OS Configuration Selection
             if (terminalState === 0) {
+                let envSelection = command.trim().toLowerCase();
+                if (envSelection === 'mac' || envSelection === 'win') {
+                    currentOS = envSelection;
+                    termOut.innerHTML += `<br/><span style="color:var(--neon-green);">[+] Environment kernel configured to ${envSelection.toUpperCase()}.</span>`;
+                    termOut.innerHTML += `<br/><span style="color:var(--text-muted);">Please enter your user designation (Name):</span>`;
+                    termInput.placeholder = "Enter your name...";
+                    terminalState = 1; 
+                } else {
+                    termOut.innerHTML += `<br/><span style="color:var(--neon-red);">[-] Invalid input. Please type 'mac' or 'win':</span>`;
+                }
+            }
+            // STATE 1: Name Collection
+            else if (terminalState === 1) {
                 if (command.trim() !== "") {
                     userName = command.trim();
+                    const formattedName = userName.toLowerCase().replace(/\s+/g, '_');
+                    
+                    // Apply OS specific prompt styling
+                    if (currentOS === 'mac') {
+                        promptPrefix.innerText = `${formattedName}@MacBook-Pro ~ %`;
+                    } else {
+                        promptPrefix.innerText = `C:\\Users\\${formattedName}>`;
+                    }
+
                     termOut.innerHTML += `<br/><span style="color:var(--neon-green);">[+] Hello, ${userName}. Welcome to the Base-C Execution Environment.</span>`;
                     termOut.innerHTML += `<br/><span style="color:var(--text-muted);">System idle. Select a Target from the dashboard to begin programming.</span>`;
-                    
-                    const formattedName = userName.toLowerCase().replace(/\s+/g, '_');
-                    promptPrefix.innerText = `${formattedName}@base-c:~#`;
                     termInput.placeholder = "Terminal idle...";
                     
                     if (typeof audioSys !== 'undefined') audioSys.speak(`Hello, ${userName}. System ready.`);
-                    terminalState = 1; 
+                    terminalState = 2; 
                 } else {
                     termOut.innerHTML += `<br/><span style="color:var(--neon-red);">[-] Name cannot be empty. Please enter your designation:</span>`;
                 }
             } 
-            // STATE 1: Idle Command Execution
-            else if (terminalState === 1) {
+            // STATE 2: Idle Command Execution
+            else if (terminalState === 2) {
                 if (command.trim() !== "") {
                     termOut.innerHTML += `<br/><span style="color:var(--text-muted);">[-] Unrecognized command. Click 'Compile' to run your C code.</span>`;
                 }
             }
-            // STATE 2: Accumulating Input for Compiler
-            else if (terminalState === 2) {
+            // STATE 3: STDIN Accumulation
+            else if (terminalState === 3) {
                 if (command === "") {
-                    // If the user hits enter on an empty line, execute the code
                     termOut.innerHTML += `<br/><span style="color:var(--text-muted);">[Input complete. Sending payload to compiler...]</span>`;
                     executeWandbox(pendingCode, stdInBuffer.trim());
-                    
-                    // Return system to idle state
-                    terminalState = 1; 
+                    terminalState = 2; 
                     stdInBuffer = ""; 
                     termInput.placeholder = "Terminal idle...";
                 } else {
-                    // Accumulate the input with a line break and ask for more
                     stdInBuffer += command + "\n";
                     termInput.placeholder = "Type more input, or leave blank and press Enter to run...";
                 }
             }
 
-            // Auto-scroll
             setTimeout(() => { consoleView.scrollTop = consoleView.scrollHeight; }, 50);
         }
     });
 
-    // Auto-focus logic
     consoleView.addEventListener('click', () => termInput.focus());
 
-    // --- B. Handle Compile Button Execution ---
     document.getElementById('run-btn').addEventListener('click', () => {
         document.querySelector('[data-target="console"]').click();
         const code = window.editor ? window.editor.getValue() : "";
         
-        // Smart Check: Does the C code request user input?
         const requiresInput = /scanf|gets|fgets|getchar/.test(code);
         
         if (requiresInput) {
@@ -638,26 +682,21 @@ function attachTerminalAndCompilerEvents() {
             termOut.innerHTML += `<br/><span style="color:var(--text-muted);">Please type your inputs below. You can press Enter after each value.</span>`;
             termOut.innerHTML += `<br/><span style="color:var(--neon-cyan); font-weight:bold;">[INFO] When finished, leave the line blank and press Enter to execute.</span>`;
             
-            terminalState = 2; // Shift state to capture STDIN
+            terminalState = 3; 
             pendingCode = code;
-            stdInBuffer = ""; // Clear buffer
+            stdInBuffer = ""; 
             termInput.placeholder = "Type input and press Enter...";
             termInput.focus();
             
             if (typeof audioSys !== 'undefined') audioSys.speak("Input required. Please enter values, then submit an empty line to execute.");
             setTimeout(() => { consoleView.scrollTop = consoleView.scrollHeight; }, 50);
         } else {
-            // Bypass STDIN collection and execute immediately
             executeWandbox(code, "");
         }
     });
 
-    // --- C. AI Source Code Scanner ---
     document.getElementById('ai-scan-btn').addEventListener('click', () => {
-        if (!aiStudioEnabled) { 
-            showToast("AI Studio is OFF."); 
-            return; 
-        }
+        if (!aiStudioEnabled) { showToast("AI Studio is OFF."); return; }
         
         document.querySelector('[data-target="ai"]').click();
         const code = window.editor ? window.editor.getValue() : "";
@@ -681,9 +720,11 @@ function attachTerminalAndCompilerEvents() {
         }, 1500);
     });
 
-    // --- D. Remote Compiler API Call (Wandbox) ---
     async function executeWandbox(code, stdInput) {
-        termOut.innerHTML += `<br/><span style="color:var(--neon-cyan);">root@base-c:~# gcc -O3 -Wall source_main.c -o payload_bin</span><br/><span style="color:var(--text-muted);">Compiling and executing on remote server...</span>`;
+        // Change command visualization depending on the chosen OS environment
+        let executionCmd = currentOS === 'win' ? 'gcc -O3 -Wall source_main.c -o payload.exe' : 'clang -O3 -Wall source_main.c -o payload_bin';
+        
+        termOut.innerHTML += `<br/><span style="color:var(--neon-cyan);">${promptPrefix.innerText} ${executionCmd}</span><br/><span style="color:var(--text-muted);">Compiling and executing on remote server...</span>`;
         setTimeout(() => { consoleView.scrollTop = consoleView.scrollHeight; }, 50);
         
         try {
@@ -693,27 +734,23 @@ function attachTerminalAndCompilerEvents() {
                 body: JSON.stringify({
                     compiler: 'gcc-head-c', 
                     code: code,
-                    stdin: stdInput, // Dynamically passing the accumulated input buffer
+                    stdin: stdInput,
                     save: false
                 })
             });
 
             const data = await response.json();
 
-            // SUCCESS RESPONSE
             if (data.status == 0) {
                 const output = data.program_output || data.compiler_message || "";
                 termOut.innerHTML += `<br/><br/><span style="color:var(--neon-green);">${output.replace(/\n/g, '<br/>')}</span>`;
                 termOut.innerHTML += `<br/><span style="color:var(--neon-cyan);">${promptPrefix.innerText} Execution complete.</span>`;
                 if(typeof audioSys !== 'undefined') audioSys.speak("Compilation successful. Code executed perfectly.");
-            } 
-            // ERROR RESPONSE
-            else {
+            } else {
                 const fullError = data.compiler_error || data.program_error || "Unknown compilation error.";
                 termOut.innerHTML += `<br/><br/><span style="color:var(--neon-red);">${fullError.replace(/\n/g, '<br/>')}</span>`;
                 termOut.innerHTML += `<br/><span style="color:var(--neon-red);">${promptPrefix.innerText} Execution Failed.</span>`;
                 
-                // Smarter AI Diagnosis formatting (prevents false "Syntax Error" claims)
                 let lineMatch = fullError.match(/prog\.c:(\d+)/);
                 let textLineInfo = "";
                 
@@ -742,14 +779,13 @@ function attachTerminalAndCompilerEvents() {
                 if(typeof audioSys !== 'undefined') audioSys.speak("Execution failed. " + textLineInfo);
             }
         } catch (error) {
-            termOut.innerHTML += `<br/><span style="color:var(--neon-red);">root@base-c:~# API Error: Cloud compiler offline.</span>`;
+            termOut.innerHTML += `<br/><span style="color:var(--neon-red);">${promptPrefix.innerText} API Error: Cloud compiler offline.</span>`;
             if(typeof audioSys !== 'undefined') audioSys.speak("Error. Cannot connect to the compiler server.");
         }
         setTimeout(() => { consoleView.scrollTop = consoleView.scrollHeight; }, 50);
     }
 }
 
-// Initialize System on DOM Load
 window.addEventListener('DOMContentLoaded', () => {
     init();
     attachTerminalAndCompilerEvents();
