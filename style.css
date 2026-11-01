@@ -378,6 +378,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, .task-card:focus-vis
 .btn-save { background: var(--glass-bg); color: var(--text-main); border: 1px solid var(--glass-border); }
 .btn-save:hover { background: var(--glass-highlight); box-shadow: 0 4px 15px rgba(255,255,255,0.05); }
 
+.btn-print { background: var(--glass-bg); color: var(--neon-cyan); border: 1px solid var(--neon-cyan-dim); }
+.btn-print:hover { background: var(--neon-cyan-dim); box-shadow: 0 4px 15px rgba(0, 240, 255, 0.2); transform: translateY(-2px); }
+
 .btn-run { background: var(--neon-green); color: #ffffff; box-shadow: 0 4px 20px var(--neon-green-glow); }
 .btn-run:hover { transform: translateY(-2px); background: #059669; box-shadow: 0 6px 25px var(--neon-green-glow); }
 
